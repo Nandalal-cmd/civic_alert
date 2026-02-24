@@ -1,0 +1,155 @@
+{% load static %}
+<script src="{% static 'complaints/js/tailwind.js' %}"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<div class="min-h-screen bg-gray-100 flex flex-col">
+    <header class="bg-white border-b p-4 flex justify-between items-center px-8">
+        <h2 class="text-xl font-bold text-blue-900">Citizen Dashboard</h2>
+        <div class="flex items-center gap-4">
+            <span class="text-gray-600">Welcome, <strong>{{ user.username }}</strong></span>
+            <a href="{% url 'logout' %}" class="text-sm text-red-600 hover:underline">Logout</a>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border">
+            <h3 class="text-lg font-bold mb-4 border-b pb-2">Submit New Report</h3>
+
+            <!-- Duplicate Alert -->
+            {% if duplicate_complaint %}
+            <div class="mb-6 p-4 bg-orange-50 border-l-4 border-orange-500 rounded shadow-sm">
+                <h4 class="font-bold text-orange-800 text-sm">Duplicate Detected!</h4>
+                <p class="text-xs text-orange-700 mt-1">
+                    Someone already reported a <strong>{{ duplicate_complaint.category }}</strong> issue
+                    <strong>{{ duplicate_distance }}m</strong> away from this location.
+                </p>
+                <div class="mt-3 flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-500">Current Upvotes: {{ duplicate_complaint.upvotes
+                        }}</span>
+                    <a href="{% url 'upvote_complaint' duplicate_complaint.id %}"
+                        class="text-xs bg-orange-600 text-white px-3 py-1.5 rounded font-bold hover:bg-orange-700 transition shadow-sm">
+                        Upvote Instead
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Django Messages -->
+            {% if messages %}
+            {% for message in messages %}
+            <div
+                class="mb-4 p-3 rounded text-sm font-medium {% if message.tags == 'error' %}bg-red-100 text-red-700{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-700{% else %}bg-green-100 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <form method="post" enctype="multipart/form-data" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Category</label>
+                    <select name="category"
+                        class="w-full mt-1 border rounded-md p-2 bg-gray-50 focus:ring-2 focus:ring-blue-500">
+                        <option>Roads</option>
+                        <option>Water</option>
+                        <option>Electricity</option>
+                        <option>Traffic</option>
+                        <option>Pollution</option>
+                        <option>Others</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea name="description" rows="4" class="w-full mt-1 border rounded-md p-2 bg-gray-50"
+                        placeholder="Describe the issue..."></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Point Issue Location</label>
+                    <div id="map" class="h-64 w-full rounded-md border shadow-inner"></div>
+                    <input type="hidden" name="latitude" id="latitude">
+                    <input type="hidden" name="longitude" id="longitude">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Upload Photo</label>
+                    <input type="file" name="image" class="text-sm mt-1">
+                </div>
+                <button type="submit"
+                    class="w-full bg-blue-600 text-white py-2 rounded-md font-bold hover:bg-blue-700 transition">Submit
+                    Complaint</button>
+            </form>
+        </div>
+
+        <div class="lg:col-span-2 space-y-6">
+            {% if notifications %}
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded shadow-sm">
+                <h4 class="font-bold text-yellow-800">Recent Updates</h4>
+                {% for note in notifications %}
+                <p class="text-sm text-yellow-700 mt-1">• {{ note.message }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <h3 class="text-xl font-bold">Your Reports</h3>
+            {% for c in complaints %}
+            <div class="bg-white p-6 rounded-xl shadow-sm border flex justify-between items-start">
+                <div>
+                    <span
+                        class="text-xs font-bold uppercase tracking-wider px-2 py-1 rounded 
+                        {% if c.status == 'Pending' %}bg-orange-100 text-orange-700{% elif c.status == 'In Progress' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
+                        {{ c.status }}
+                    </span>
+                    <h4 class="text-lg font-bold mt-2">{{ c.category }}</h4>
+                    <p class="text-gray-600 text-sm mt-1">{{ c.description }}</p>
+
+                    <div class="flex items-center gap-4 mt-3">
+                        <span class="flex items-center gap-1 text-xs text-gray-400">
+                            📍 {{ c.latitude }}, {{ c.longitude }}
+                        </span>
+                        <span
+                            class="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                            👍 {{ c.upvotes }} Upvotes
+                        </span>
+                    </div>
+
+                    {% if c.admin_comment %}
+                    <div class="mt-3 p-3 bg-gray-50 rounded italic text-sm text-gray-700 border-l-2 border-blue-500">
+                        "{{ c.admin_comment }}"
+                    </div>
+                    {% endif %}
+                </div>
+                <small class="text-gray-400">{{ c.created_at|date:"M d, Y" }}</small>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+</div>
+
+<script>
+    var map = L.map('map').setView([27.7172, 85.3240], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    var marker;
+    function onMapClick(e) {
+        if (marker) marker.setLatLng(e.latlng);
+        else marker = L.marker(e.latlng).addTo(map);
+        document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
+        document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+    }
+    map.on('click', onMapClick);
+
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(function (position) {
+            map.setView([position.coords.latitude, position.coords.longitude], 15);
+        });
+    }
+    setTimeout(function () { map.invalidateSize(); }, 500);
+</script>
