@@ -1,0 +1,354 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicAlert | Admin Control</title>
+    <script src="{% static 'complaints/js/tailwind.js' %}"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+
+        @keyframes marker-pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
+        .custom-div-icon {
+            background: none !important;
+            border: none !important;
+            z-index: 1000 !important;
+        }
+
+        /* Pointy Pin Styles */
+        .marker-pin {
+            width: 36px;
+            height: 36px;
+            border-radius: 50% 50% 50% 0;
+            background: #EF4444;
+            border: 2px solid white;
+            transform: rotate(-45deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .marker-pin span {
+            transform: rotate(45deg);
+            /* Keep plus upright */
+            color: white;
+            font-size: 22px;
+            font-weight: 900;
+            display: block;
+            margin-right: 2px;
+            margin-bottom: 2px;
+        }
+
+        .marker-pulse {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 36px;
+            height: 36px;
+            border-radius: 50% 50% 50% 0;
+            animation: marker-pulse 2s infinite;
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 font-sans text-slate-900">
+
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-indigo-900 text-white p-6 hidden lg:block">
+            <h1 class="text-2xl font-black tracking-tighter mb-10 flex items-center gap-2">
+                <span class="bg-white text-indigo-900 p-1 rounded">CA</span> CivicAlert
+            </h1>
+            <nav class="space-y-4">
+                <a href="#" class="flex items-center gap-3 bg-indigo-800 p-3 rounded-xl font-bold">
+                    📊 Overview
+                </a>
+                <a href="{% url 'home' %}"
+                    class="flex items-center gap-3 hover:bg-indigo-800 p-3 rounded-xl transition">
+                    🌐 Site Home
+                </a>
+                <div class="pt-10">
+                    <a href="{% url 'logout' %}"
+                        class="flex items-center gap-3 text-indigo-300 hover:text-white transition">
+                        🚪 Logout
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-8">
+            <header class="flex justify-between items-end mb-10">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-800">Municipal Command Center</h2>
+                    <p class="text-slate-500 font-medium">Real-time infrastructure management dashboard</p>
+                </div>
+                <div class="flex items-center gap-4 bg-white p-2 px-4 rounded-2xl shadow-sm border">
+                    <div
+                        class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
+                        {{ user.username|first|upper }}
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold">{{ user.username }}</p>
+                        <p class="text-xs text-slate-400 capitalize">
+                        </p>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+                <div class="bg-white p-6 rounded-3xl border shadow-sm border-b-4 border-b-indigo-500">
+                    <p class="text-slate-400 text-sm font-bold mb-1 uppercase tracking-widest">Total Reports</p>
+                    <h3 class="text-4xl font-black text-indigo-900">{{ stats.total }}</h3>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border shadow-sm border-b-4 border-b-red-500">
+                    <p class="text-slate-400 text-sm font-bold mb-1 uppercase tracking-widest">Pending</p>
+                    <h3 class="text-4xl font-black text-red-600">{{ stats.pending }}</h3>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border shadow-sm border-b-4 border-b-yellow-400">
+                    <p class="text-slate-400 text-sm font-bold mb-1 uppercase tracking-widest">In Progress</p>
+                    <h3 class="text-4xl font-black text-yellow-500">{{ stats.in_progress }}</h3>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border shadow-sm border-b-4 border-b-emerald-500">
+                    <p class="text-slate-400 text-sm font-bold mb-1 uppercase tracking-widest">Resolved</p>
+                    <h3 class="text-4xl font-black text-emerald-600">{{ stats.resolved }}</h3>
+                </div>
+            </div>
+
+            <!-- Map View -->
+            <div class="bg-white p-6 rounded-3xl border shadow-sm mb-10">
+                <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                    🎯 Infrastructure Radar (Live)
+                    <span id="map-counter" class="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">0
+                        Points Loaded</span>
+                </h3>
+                <div id="admin-map" class="h-96 w-full rounded-2xl z-0 border shadow-inner bg-slate-100"></div>
+            </div>
+
+            <!-- Management Table -->
+            <div class="bg-white rounded-3xl border shadow-sm overflow-hidden">
+                <div class="p-6 border-b flex justify-between items-center">
+                    <h3 class="font-bold">Recent Submissions</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-widest">
+                            <tr>
+                                <th class="p-4 px-6 text-center">ID</th>
+                                <th class="p-4">Media</th>
+                                <th class="p-4">Incident/Category</th>
+                                <th class="p-4">Citizen</th>
+                                <th class="p-4">Score</th>
+                                <th class="p-4">Priority</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            {% for c in complaints %}
+                            <tr class="hover:bg-slate-50 transition">
+                                <td class="p-4 px-6 text-center text-slate-400 font-mono text-xs">#{{ c.id }}</td>
+                                <td class="p-4">
+                                    {% if c.image %}
+                                    <img src="{{ c.image.url }}" class="w-12 h-12 object-cover rounded-lg shadow-sm cursor-pointer hover:scale-110 transition" onclick="openModal('{{ c.id }}', '{{ c.status|escapejs }}', '{{ c.admin_comment|default:''|escapejs }}', '{{ c.priority|escapejs }}', '{{ c.image.url|escapejs }}')">
+                                    {% else %}
+                                    <div class="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-300">
+                                        📷
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td class="p-4">
+                                    <p class="font-bold text-slate-800">{{ c.category }}</p>
+                                    <p class="text-xs text-slate-400 truncate max-w-xs">{{ c.description }}</p>
+                                </td>
+                                <td class="p-4 text-sm font-medium">{{ c.citizen.username }}</td>
+                                <td class="p-4">
+                                    <span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
+                                        👍 {{ c.upvotes }}
+                                    </span>
+                                </td>
+                                <td class="p-4">
+                                    <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase
+                                        {% if c.priority == 'Critical' %}bg-red-600 text-white
+                                        {% elif c.priority == 'High' %}bg-orange-100 text-orange-700
+                                        {% elif c.priority == 'Medium' %}bg-blue-100 text-blue-700
+                                        {% else %}bg-slate-100 text-slate-700{% endif %}">
+                                        {{ c.priority }}
+                                    </span>
+                                </td>
+                                <td class="p-4">
+                                    <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase
+                                        {% if c.status == 'Pending' %}bg-red-100 text-red-700
+                                        {% elif c.status == 'In Progress' %}bg-yellow-100 text-yellow-700
+                                        {% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                        {{ c.status }}
+                                    </span>
+                                </td>
+                                <td class="p-4">
+                                    <button
+                                        onclick="openModal('{{ c.id }}', '{{ c.status|escapejs }}', '{{ c.admin_comment|default:''|escapejs }}', '{{ c.priority|escapejs }}', '{% if c.image %}{{ c.image.url|escapejs }}{% endif %}')"
+                                        class="bg-indigo-50 text-indigo-700 p-2 px-4 rounded-xl text-xs font-bold hover:bg-indigo-100 transition">
+                                        Manage
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Management Modal -->
+    <div id="manageModal" class="fixed inset-0 bg-slate-900/50 hidden z-50 flex items-center justify-center p-4">
+        <div
+            class="glass w-full max-w-md rounded-3xl shadow-2xl overflow-hidden p-8 animate-in fade-in zoom-in duration-200">
+            <h3 class="text-2xl font-black mb-6">Manage Complaint <span id="modalIdDisplay"
+                    class="text-indigo-600"></span></h3>
+            <form id="updateForm" method="post" action="">
+                {% csrf_token %}
+                <div class="space-y-4">
+                    <div id="modalImageContainer" class="hidden mb-4 rounded-2xl overflow-hidden border">
+                        <img id="modalImage" src="" class="w-full h-48 object-cover">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold uppercase text-slate-400 tracking-widest pl-1">Update
+                                Status</label>
+                            <select name="status" id="statusSelect"
+                                class="w-full mt-1 bg-slate-50 border rounded-2xl p-4 font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="Pending">Pending</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Resolved">Resolved</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold uppercase text-slate-400 tracking-widest pl-1">Set
+                                Priority</label>
+                            <select name="priority" id="prioritySelect"
+                                class="w-full mt-1 bg-slate-50 border rounded-2xl p-4 font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold uppercase text-slate-400 tracking-widest pl-1">Official
+                            Response</label>
+                        <textarea name="admin_comment" id="commentArea" rows="4"
+                            class="w-full mt-1 bg-slate-50 border rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            placeholder="Provide an update for the citizen..."></textarea>
+                    </div>
+                </div>
+                <div class="mt-8 flex gap-3">
+                    <button type="button" onclick="closeModal()"
+                        class="flex-1 bg-slate-100 p-4 rounded-2xl font-bold hover:bg-slate-200 transition">Cancel</button>
+                    <button type="submit"
+                        class="flex-1 bg-indigo-600 text-white p-4 rounded-2xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition">Save
+                        Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script id="locationData" type="application/json">
+        {{ locations|safe }}
+    </script>
+
+    <script>
+        // Init Admin Map
+        var map = L.map('admin-map').setView([27.7172, 85.3240], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        const locationDataEl = document.getElementById('locationData');
+        const locations = locationDataEl ? JSON.parse(locationDataEl.textContent) : [];
+
+        const counterEl = document.getElementById('map-counter');
+        if (counterEl) counterEl.innerText = locations.length + " Active Points";
+
+        const validCoords = [];
+
+        locations.forEach(loc => {
+            if (!loc.lat || !loc.lng) return;
+            validCoords.push([loc.lat, loc.lng]);
+
+            let color = loc.status === 'Pending' ? '#EF4444' : '#FACC15';
+
+            let icon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `
+                    <div class="marker-pin" style="background-color: ${color} !important;">
+                        <span>+</span>
+                        ${loc.status === 'Pending' ? `<div class="marker-pulse" style="border: 2px solid ${color};"></div>` : ''}
+                    </div>
+                `,
+                iconSize: [36, 36],
+                iconAnchor: [18, 36] // Anchor at the very bottom point
+            });
+
+            L.marker([loc.lat, loc.lng], { icon: icon }).addTo(map)
+                .bindPopup(`<strong>${loc.category}</strong><br>Status: ${loc.status}<br>ID: #${loc.id}`);
+        });
+
+        if (validCoords.length > 0) {
+            map.fitBounds(L.latLngBounds(validCoords), { padding: [50, 50] });
+        }
+
+        function openModal(id, status, comment, priority, imageUrl) {
+            document.getElementById('modalIdDisplay').innerText = '#' + id;
+            document.getElementById('statusSelect').value = status;
+            document.getElementById('prioritySelect').value = priority;
+            document.getElementById('commentArea').value = comment;
+            
+            const imgContainer = document.getElementById('modalImageContainer');
+            const imgEl = document.getElementById('modalImage');
+            if (imageUrl) {
+                imgEl.src = imageUrl;
+                imgContainer.classList.remove('hidden');
+            } else {
+                imgContainer.classList.add('hidden');
+            }
+
+            document.getElementById('updateForm').action = "/admin-panel/update/" + id + "/";
+            document.getElementById('manageModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('manageModal').classList.add('hidden');
+        }
+
+        document.getElementById('manageModal').onclick = function (e) {
+            if (e.target === this) closeModal();
+        };
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,130 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicAlert | Admin Portal</title>
+    <script src="{% static 'complaints/js/tailwind.js' %}"></script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(15px);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-indigo-950 font-sans text-slate-900 flex items-center justify-center min-h-screen p-4 overflow-hidden relative">
+
+    <!-- Background Accents -->
+    <div class="absolute top-0 -left-20 w-80 h-80 bg-indigo-600 rounded-full blur-[120px] opacity-20"></div>
+    <div class="absolute bottom-0 -right-20 w-80 h-80 bg-blue-500 rounded-full blur-[120px] opacity-20"></div>
+
+    <div class="w-full max-w-md relative z-10 scale-in-center">
+        <!-- Brand -->
+        <div class="text-center mb-10">
+            <h1 class="text-3xl font-black text-white tracking-tighter flex items-center justify-center gap-2">
+                <span class="bg-white text-indigo-900 px-2 py-0.5 rounded shadow-lg">CA</span> CivicAlert
+            </h1>
+            <p class="text-indigo-300 font-bold mt-2 uppercase tracking-widest text-xs">Municipal Command Center</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="glass p-10 rounded-[2.5rem] shadow-2xl border border-white/20">
+            <h2 class="text-2xl font-black text-indigo-950 mb-2">Staff Login</h2>
+            <p class="text-indigo-900/60 text-sm mb-8 font-medium">Please authenticate to access city management tools.
+            </p>
+
+            {% if messages %}
+            <div class="mb-6 space-y-2">
+                {% for message in messages %}
+                <div
+                    class="p-4 rounded-2xl text-xs font-bold {% if message.tags == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-100{% else %}bg-red-50 text-red-700 border border-red-100{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="POST" class="space-y-5">
+                {% csrf_token %}
+                <div>
+                    <label
+                        class="block text-[10px] font-black uppercase tracking-widest text-indigo-900/40 mb-1.5 ml-1">Admin
+                        Username</label>
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                    <p class="text-red-500 text-[10px] mt-1 font-bold ml-1">{{ form.username.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label
+                        class="block text-[10px] font-black uppercase tracking-widest text-indigo-900/40 mb-1.5 ml-1">Security
+                        Password</label>
+                    {{ form.password }}
+                    {% if form.password.errors %}
+                    <p class="text-red-500 text-[10px] mt-1 font-bold ml-1">{{ form.password.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit"
+                        class="w-full bg-indigo-600 text-white p-4 rounded-2xl font-black shadow-lg shadow-indigo-900/30 hover:bg-indigo-700 transition transform hover:-translate-y-0.5 active:translate-y-0">
+                        Access Dashboard
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-8 pt-6 border-t border-indigo-100 text-center">
+                <a href="{% url 'home' %}"
+                    class="text-indigo-600/60 hover:text-indigo-600 text-xs font-bold transition">
+                    &larr; Back to Public Portal
+                </a>
+            </div>
+        </div>
+
+        <p class="text-center text-indigo-300/40 text-[10px] uppercase font-black tracking-widest mt-8">
+            &copy; 2026 CivicAlert Authority • Secured Protocol
+        </p>
+    </div>
+
+    <style>
+        input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.5);
+            border: 2px solid #e2e8f0;
+            border-radius: 1.25rem;
+            padding: 1rem 1.25rem;
+            outline: none;
+            font-weight: 700;
+            color: #1e1b4b;
+            transition: all 0.2s;
+        }
+
+        input:focus {
+            border-color: #4f46e5;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        .scale-in-center {
+            animation: scale-in-center 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+        }
+
+        @keyframes scale-in-center {
+            0% {
+                transform: scale(0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</body>
+
+</html>

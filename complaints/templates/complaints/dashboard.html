@@ -1,0 +1,260 @@
+{% load static %}
+<script src="{% static 'complaints/js/tailwind.js' %}"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<div class="min-h-screen bg-gray-100 flex flex-col">
+    <header class="bg-white border-b p-4 flex justify-between items-center px-8">
+        <h2 class="text-xl font-bold text-blue-900">Citizen Dashboard</h2>
+        <div class="flex items-center gap-4">
+            <span class="text-gray-600">Welcome, <strong>{{ user.username }}</strong></span>
+            <a href="{% url 'logout' %}" class="text-sm text-red-600 hover:underline">Logout</a>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border">
+            <h3 class="text-lg font-bold mb-4 border-b pb-2">Submit New Report</h3>
+
+            <!-- Duplicate Alert -->
+            {% if duplicate_complaint %}
+            <div class="mb-6 p-4 bg-orange-50 border-l-4 border-orange-500 rounded shadow-sm">
+                <h4 class="font-bold text-orange-800 text-sm">Duplicate Detected!</h4>
+                <p class="text-xs text-orange-700 mt-1">
+                    Someone already reported a <strong>{{ duplicate_complaint.category }}</strong> issue
+                    <strong>{{ duplicate_distance }}m</strong> away from this location.
+                </p>
+                <div class="mt-3 flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-500">Current Upvotes: {{ duplicate_complaint.upvotes
+                        }}</span>
+                    <a href="{% url 'upvote_complaint' duplicate_complaint.id %}"
+                        class="text-xs bg-orange-600 text-white px-3 py-1.5 rounded font-bold hover:bg-orange-700 transition shadow-sm">
+                        Upvote Instead
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Django Messages -->
+            {% if messages %}
+            {% for message in messages %}
+            <div
+                class="mb-4 p-3 rounded text-sm font-medium {% if message.tags == 'error' %}bg-red-100 text-red-700{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-700{% else %}bg-green-100 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <form method="post" enctype="multipart/form-data" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Category</label>
+                    <select name="category"
+                        class="w-full mt-1 border rounded-md p-2 bg-gray-50 focus:ring-2 focus:ring-blue-500">
+                        <option>Roads</option>
+                        <option>Water</option>
+                        <option>Electricity</option>
+                        <option>Traffic</option>
+                        <option>Pollution</option>
+                        <option>Others</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea name="description" rows="4" class="w-full mt-1 border rounded-md p-2 bg-gray-50"
+                        placeholder="Describe the issue..."></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Point Issue Location</label>
+                    <div id="map" class="h-64 w-full rounded-md border shadow-inner"></div>
+                    <button type="button" id="locateBtn"
+                        class="mt-2 w-full flex items-center justify-center gap-2 bg-blue-50 border border-blue-300 text-blue-700 text-sm font-semibold py-1.5 rounded-md hover:bg-blue-100 active:scale-95 transition">
+                        📍 Use My Location
+                    </button>
+                    <input type="hidden" name="latitude" id="latitude">
+                    <input type="hidden" name="longitude" id="longitude">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Upload Photo</label>
+                    <input type="file" name="image" class="text-sm mt-1">
+                </div>
+                <button type="submit"
+                    class="w-full bg-blue-600 text-white py-2 rounded-md font-bold hover:bg-blue-700 transition">Submit
+                    Complaint</button>
+            </form>
+        </div>
+
+        <div class="lg:col-span-2 space-y-6">
+            {% if notifications %}
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded shadow-sm">
+                <h4 class="font-bold text-yellow-800">Recent Updates</h4>
+                {% for note in notifications %}
+                <p class="text-sm text-yellow-700 mt-1">• {{ note.message }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <h3 class="text-xl font-bold">Your Reports</h3>
+            {% for c in complaints %}
+            <div class="bg-white p-6 rounded-xl shadow-sm border flex justify-between items-start">
+                <div>
+                    <span
+                        class="text-xs font-bold uppercase tracking-wider px-2 py-1 rounded 
+                        {% if c.status == 'Pending' %}bg-orange-100 text-orange-700{% elif c.status == 'In Progress' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
+                        {{ c.status }}
+                    </span>
+                    <h4 class="text-lg font-bold mt-2">{{ c.category }}</h4>
+                    <p class="text-gray-600 text-sm mt-1">{{ c.description }}</p>
+
+                    <div class="flex items-center gap-4 mt-3">
+                        <span class="flex items-center gap-1 text-xs text-gray-400">
+                            📍 {{ c.latitude }}, {{ c.longitude }}
+                        </span>
+                        <span
+                            class="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                            👍 {{ c.upvotes }} Upvotes
+                        </span>
+                    </div>
+
+                    {% if c.admin_comment %}
+                    <div class="mt-3 p-3 bg-gray-50 rounded italic text-sm text-gray-700 border-l-2 border-blue-500">
+                        "{{ c.admin_comment }}"
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="flex flex-col items-end gap-2">
+                    <small class="text-gray-400">{{ c.created_at|date:"M d, Y" }}</small>
+                    <button type="button"
+                        class="print-btn flex items-center gap-1 text-xs font-semibold text-gray-600 border border-gray-300 px-3 py-1 rounded hover:bg-gray-100 transition"
+                        data-id="{{ c.id }}" data-category="{{ c.category }}"
+                        data-description="{{ c.description|escapejs }}" data-status="{{ c.status }}"
+                        data-lat="{{ c.latitude }}" data-lng="{{ c.longitude }}" data-upvotes="{{ c.upvotes }}"
+                        data-date="{{ c.created_at|date:'M d, Y' }}" data-citizen="{{ user.username }}"
+                        data-admin="{{ c.admin_comment|escapejs }}">
+                        🖨️ Print
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+</div>
+
+<script>
+    var map = L.map('map').setView([27.7172, 85.3240], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    var marker;
+    function onMapClick(e) {
+        if (marker) marker.setLatLng(e.latlng);
+        else marker = L.marker(e.latlng).addTo(map);
+        document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
+        document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+    }
+    map.on('click', onMapClick);
+
+    document.getElementById('locateBtn').addEventListener('click', function () {
+        if (!("geolocation" in navigator)) {
+            alert("Geolocation is not supported by your browser.");
+            return;
+        }
+        var btn = this;
+        btn.textContent = "⏳ Locating...";
+        btn.disabled = true;
+        navigator.geolocation.getCurrentPosition(
+            function (pos) {
+                var lat = pos.coords.latitude;
+                var lng = pos.coords.longitude;
+                map.flyTo([lat, lng], 17);
+                if (marker) marker.setLatLng([lat, lng]);
+                else marker = L.marker([lat, lng]).addTo(map);
+                marker.bindPopup("📍 Your current location").openPopup();
+                document.getElementById('latitude').value = lat.toFixed(6);
+                document.getElementById('longitude').value = lng.toFixed(6);
+                btn.textContent = "✅ Location Set";
+                btn.disabled = false;
+            },
+            function (err) {
+                alert("Could not get your location: " + err.message);
+                btn.textContent = "📍 Use My Location";
+                btn.disabled = false;
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    });
+    setTimeout(function () { map.invalidateSize(); }, 500);
+
+    function printReport(id, category, description, status, lat, lng, upvotes, date, citizen, adminComment) {
+        var statusColor = status === 'Pending' ? '#c2410c' : status === 'In Progress' ? '#1d4ed8' : '#15803d';
+        var statusBg = status === 'Pending' ? '#fff7ed' : status === 'In Progress' ? '#eff6ff' : '#f0fdf4';
+        var adminSection = adminComment
+            ? '<tr><th>Admin Comment</th><td><em>' + adminComment + '</em></td></tr>'
+            : '';
+        var mapUrl = (lat && lng)
+            ? 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=17/' + lat + '/' + lng
+            : null;
+        var mapLink = mapUrl
+            ? '<p style="margin-top:10px;font-size:12px;">📍 View on map: <a href="' + mapUrl + '">' + mapUrl + '</a></p>'
+            : '';
+        var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Complaint Receipt – CivicAlert</title>'
+            + '<style>'
+            + 'body{font-family:"Segoe UI",Arial,sans-serif;margin:0;padding:30px;color:#1e293b;background:#fff;}'
+            + '.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #1d4ed8;padding-bottom:14px;margin-bottom:20px;}'
+            + '.logo{font-size:22px;font-weight:800;color:#1d4ed8;letter-spacing:-0.5px;}'
+            + '.logo span{color:#f97316;}'
+            + '.ref{font-size:11px;color:#64748b;text-align:right;}'
+            + '.badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:' + statusBg + ';color:' + statusColor + ';margin-bottom:16px;}'
+            + 'table{width:100%;border-collapse:collapse;margin-top:8px;}'
+            + 'th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;}'
+            + 'th{width:170px;color:#64748b;font-weight:600;background:#f8fafc;}'
+            + '.footer{margin-top:28px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;}'
+            + '@media print{body{padding:15px;}.no-print{display:none;}}'
+            + '</style></head><body>'
+            + '<div class="header">'
+            + '<div class="logo">Civic<span>Alert</span></div>'
+            + '<div class="ref"><strong>COMPLAINT RECEIPT</strong><br>Ref #CA-' + String(id).padStart(5, '0') + '<br>Printed: ' + new Date().toLocaleString() + '</div>'
+            + '</div>'
+            + '<div class="badge">' + status + '</div>'
+            + '<table>'
+            + '<tr><th>Citizen</th><td>' + citizen + '</td></tr>'
+            + '<tr><th>Category</th><td>' + category + '</td></tr>'
+            + '<tr><th>Description</th><td>' + description + '</td></tr>'
+            + '<tr><th>Reported On</th><td>' + date + '</td></tr>'
+            + '<tr><th>Location (GPS)</th><td>' + (lat && lng ? lat + ', ' + lng : 'Not specified') + '</td></tr>'
+            + '<tr><th>Community Upvotes</th><td>👍 ' + upvotes + '</td></tr>'
+            + adminSection
+            + '</table>'
+            + mapLink
+            + '<div class="footer">This document is an official acknowledgment of your complaint filed via CivicAlert.<br>Please retain it as proof of submission. For queries, contact your local municipality.</div>'
+            + '<div class="no-print" style="text-align:center;margin-top:24px;"><button onclick="window.print()" style="padding:10px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">🖨️ Print / Save as PDF</button></div>'
+            + '</body></html>';
+        var w = window.open('', '_blank', 'width=780,height=700');
+        w.document.write(html);
+        w.document.close();
+    }
+
+    document.querySelectorAll('.print-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            printReport(
+                this.dataset.id,
+                this.dataset.category,
+                this.dataset.description,
+                this.dataset.status,
+                this.dataset.lat,
+                this.dataset.lng,
+                this.dataset.upvotes,
+                this.dataset.date,
+                this.dataset.citizen,
+                this.dataset.admin
+            );
+        });
+    });
+</script>
