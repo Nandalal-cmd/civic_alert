@@ -27,10 +27,20 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-j8kc@ns6n-&80uv6=tbk2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else ['*']
+# Allow all hosts for now - Render uses dynamic URLs
+ALLOWED_HOSTS = ['*']
 
-csrf_origins_str = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://127.0.0.1:8000,https://localhost:8000')
-CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_str.split(',') if origin.strip()]
+csrf_origins_str = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if csrf_origins_str:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_str.split(',') if origin.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        'http://127.0.0.1:8000',
+        'http://localhost:8000',
+        'https://127.0.0.1:8000',
+        'https://localhost:8000',
+        'https://civic-alert-3rvr.onrender.com',
+    ]
 
 CSRF_USE_SESSIONS = True
 CSRF_COOKIE_HTTPONLY = False
