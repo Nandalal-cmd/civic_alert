@@ -29,7 +29,8 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else ['*']
 
-CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://127.0.0.1:8000,http://localhost:8000').split(',')
+csrf_origins_str = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://127.0.0.1:8000,https://localhost:8000')
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_str.split(',') if origin.strip()]
 
 CSRF_USE_SESSIONS = True
 CSRF_COOKIE_HTTPONLY = False
