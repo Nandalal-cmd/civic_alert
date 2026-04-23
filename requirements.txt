@@ -1,0 +1,7 @@
+Django==6.0.1
+gunicorn
+psycopg2-binary
+whitenoise
+dj-database-url
+pillow
+python-dotenv
